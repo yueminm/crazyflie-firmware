@@ -85,6 +85,9 @@ typedef struct {
   // The quad's attitude as a rotation matrix (used by the prediction, updated by the finalization)
   float R[3][3];
 
+  // The quad's angular velocity as a vector (x, y, z)
+  float omega[3];
+
   // The covariance matrix
   __attribute__((aligned(4))) float P[KC_STATE_DIM][KC_STATE_DIM];
   arm_matrix_instance_f32 Pm;

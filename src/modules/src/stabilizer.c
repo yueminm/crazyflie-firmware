@@ -135,6 +135,8 @@ static void compressState()
   stateCompressed.vy = state.velocity.y * 1000.0f;
   stateCompressed.vz = state.velocity.z * 1000.0f;
 
+
+
   stateCompressed.ax = state.acc.x * 9.81f * 1000.0f;
   stateCompressed.ay = state.acc.y * 9.81f * 1000.0f;
   stateCompressed.az = (state.acc.z + 1) * 9.81f * 1000.0f;
@@ -174,8 +176,8 @@ void stabilizerInit(StateEstimatorType estimator)
 
   sensorsInit();
   stateEstimatorInit(estimator);
-  controllerInit(ControllerTypeAny);
-  powerDistributionInit();
+  controllerInit(ControllerTypeHover);
+  // powerDistributionInit();
   motorsInit(platformConfigGetMotorMapping());
   collisionAvoidanceInit();
   estimatorType = getStateEstimator();
@@ -193,7 +195,7 @@ bool stabilizerTest(void)
   pass &= sensorsTest();
   pass &= stateEstimatorTest();
   pass &= controllerTest();
-  pass &= powerDistributionTest();
+  // pass &= powerDistributionTest();
   pass &= motorsTest();
   pass &= collisionAvoidanceTest();
 
@@ -272,7 +274,7 @@ static void stabilizerTask(void* param)
 
       collisionAvoidanceUpdateSetpoint(&setpoint, &sensorData, &state, tick);
 
-      controller(&control, &setpoint, &sensorData, &state, tick);
+      controller(&control, &setpoint, &motorPower, &sensorData, &state, tick);
 
       checkEmergencyStopTimeout();
 
@@ -285,7 +287,7 @@ static void stabilizerTask(void* param)
       if (emergencyStop || (systemIsArmed() == false)) {
         motorsStop();
       } else {
-        powerDistribution(&motorPower, &control);
+        // powerDistribution(&motorPower, &control);
         motorsSetRatio(MOTOR_M1, motorPower.m1);
         motorsSetRatio(MOTOR_M2, motorPower.m2);
         motorsSetRatio(MOTOR_M3, motorPower.m3);

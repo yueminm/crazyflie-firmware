@@ -107,7 +107,7 @@ void appMain()
 
   while(1) {
     vTaskDelay(M2T(10));
-    //DEBUG_PRINT(".");
+    DEBUG_PRINT("activated \n");
 
     uint8_t positioningInit = paramGetUint(idPositioningDeck);
     uint8_t multirangerInit = paramGetUint(idMultiranger);

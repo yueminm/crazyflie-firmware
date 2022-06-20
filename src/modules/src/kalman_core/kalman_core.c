@@ -524,11 +524,17 @@ void kalmanCorePredict(kalmanCoreData_t* this, Axis3f *acc, Axis3f *gyro, float 
     this->S[KC_STATE_PZ] += dt * (acc->z + gyro->y * tmpSPX - gyro->x * tmpSPY - GRAVITY_MAGNITUDE * this->R[2][2]);
   }
 
+  // angular velocity update
+  this->omega[0] = DEG_TO_RAD*gyro->x;
+  this->omega[1] = DEG_TO_RAD*gyro->y;
+  this->omega[2] = DEG_TO_RAD*gyro->z;
+
   // attitude update (rotate by gyroscope), we do this in quaternions
   // this is the gyroscope angular velocity integrated over the sample period
   float dtwx = dt*gyro->x;
   float dtwy = dt*gyro->y;
   float dtwz = dt*gyro->z;
+
 
   // compute the quaternion values in [w,x,y,z] order
   float angle = arm_sqrt(dtwx*dtwx + dtwy*dtwy + dtwz*dtwz) + EPS;
@@ -724,9 +730,22 @@ void kalmanCoreExternalizeState(const kalmanCoreData_t* this, state_t *state, co
   // velocity is in body frame and needs to be rotated to world frame
   state->velocity = (velocity_t){
       .timestamp = tick,
-      .x = this->R[0][0]*this->S[KC_STATE_PX] + this->R[0][1]*this->S[KC_STATE_PY] + this->R[0][2]*this->S[KC_STATE_PZ],
-      .y = this->R[1][0]*this->S[KC_STATE_PX] + this->R[1][1]*this->S[KC_STATE_PY] + this->R[1][2]*this->S[KC_STATE_PZ],
-      .z = this->R[2][0]*this->S[KC_STATE_PX] + this->R[2][1]*this->S[KC_STATE_PY] + this->R[2][2]*this->S[KC_STATE_PZ]
+      // .x = this->R[0][0]*this->S[KC_STATE_PX] + this->R[0][1]*this->S[KC_STATE_PY] + this->R[0][2]*this->S[KC_STATE_PZ],
+      // .y = this->R[1][0]*this->S[KC_STATE_PX] + this->R[1][1]*this->S[KC_STATE_PY] + this->R[1][2]*this->S[KC_STATE_PZ],
+      // .z = this->R[2][0]*this->S[KC_STATE_PX] + this->R[2][1]*this->S[KC_STATE_PY] + this->R[2][2]*this->S[KC_STATE_PZ]
+  
+      // body frame
+      .x = this->R[0][0],
+      .y = this->R[1][0],
+      .z = this->R[2][0]
+  };
+
+  // angular velocity in body frame
+  state->angularVelocity = (angularVelocity_t){
+    .timestamp = tick,
+    .x = this->omega[0],
+    .y = this->omega[1],
+    .z = this->omega[2]
   };
 
   // Accelerometer measurements are in the body frame and need to be rotated to world frame.

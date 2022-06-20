@@ -61,6 +61,7 @@ struct vec3_s {
 typedef struct vec3_s vector_t;
 typedef struct vec3_s point_t;
 typedef struct vec3_s velocity_t;
+typedef struct vec3_s angularVelocity_t;
 typedef struct vec3_s acc_t;
 
 /* Orientation as a quaternion */
@@ -165,6 +166,7 @@ typedef struct state_s {
   point_t position;         // m
   velocity_t velocity;      // m/s
   acc_t acc;                // Gs (but acc.z without considering gravity)
+  angularVelocity_t angularVelocity;  // rad/s
 } state_t;
 
 typedef struct control_s {
