@@ -16,35 +16,37 @@
 
 #include <math.h>
 
-#define DEBUG_MODULE "CONTROLLERHOVER"
+#define DEBUG_MODULE "TESTCONTROLLERHOVER"
 
-static void setHoverSetpoint(setpoint_t *setpoint, float vx, float vy, float z, float yawrate)
+
+
+static void setInitialSetpoint(setpoint_t *setpoint, float vz)
 {
   setpoint->mode.z = modeAbs;
-  setpoint->position.z = z;
-
 
   setpoint->mode.yaw = modeVelocity;
-  setpoint->attitudeRate.yaw = yawrate;
 
-
-  setpoint->mode.x = modeVelocity;
-  setpoint->mode.y = modeVelocity;
-  setpoint->velocity.x = vx;
-  setpoint->velocity.y = vy;
+  setpoint->velocity.z = vz;
 
   setpoint->velocity_body = true;
 }
 
-typedef enum {
-    idle,
-    lowUnlock,
-    unlocked,
-    stopping
-} State;
+static void setMotorPower(motors_thrust_t *motorPower, float thrust[4])
+{
+  motorPower->m1 = thrust[0];
+  motorPower->m2 = thrust[1];
+  motorPower->m3 = thrust[2];
+  motorPower->m4 = thrust[3];
+}
 
-static State state = idle;
+// typedef enum {
+//     idle,
+//     hover
+// } State;
 
+// static State state = idle;
+
+static int startFlight = 0;
 
 #define MAX(a,b) ((a>b)?a:b)
 #define MIN(a,b) ((a<b)?a:b)
@@ -52,32 +54,48 @@ static State state = idle;
 void appMain()
 {
   static setpoint_t setpoint;
+  static motors_thrust_t motorPower;
+  float thrust_idle[4] = {0, 0, 0, 0};
 
-  vTaskDelay(M2T(3000));
+
+  vTaskDelay(M2T(1000));
 
 
   // Getting Param IDs of the deck driver initialization
-  paramVarId_t idLocoPositioningDeck = paramGetVarId("deck", "bcDWM1000");
+  // paramVarId_t idLocoPositioningDeck = paramGetVarId("deck", "bcDWM1000");
  
-  // Intialize the setpoint structure
-  setpoint_t setpoint;
  
-  DEBUG_PRINT("Waiting for activation ...\n");
+  // DEBUG_PRINT("Waiting for activation ...\n");
 
   while(1) {
     vTaskDelay(M2T(10));
-    DEBUG_PRINT("first \n");
+    // DEBUG_PRINT("first \n");
 
     // Check if decks are properly mounted
-    uint8_t locoPositioningInit = paramGetUint(idLocoPositioningDeck);
+    // uint8_t locoPositioningInit = paramGetUint(idLocoPositioningDeck);
 
-    if (1) {
-        setHoverSetpoint(&setpoint, 0.0f, 0.0f, 1.0f, 0.0f);
-        commanderSetSetpoint(&setpoint, 3);
+    if (startFlight == 0) {
+      setInitialSetpoint(&setpoint, 0.0f);
+      setMotorPower(&motorPower, thrust_idle);
+      }
+
+    else {
+      setInitialSetpoint(&setpoint, 1.0f);
+      commanderSetSetpoint(&setpoint, 3);
       }
     
-      DEBUG_PRINT("second \n");
-    
-    DEBUG_PRINT("third \n");
   }
 }
+
+
+/**
+ * [Documentation for the activation group ...]
+ */
+PARAM_GROUP_START(activation)
+
+/**
+ * @brief [Documentation for the parameter below ...]
+ */
+PARAM_ADD_CORE(PARAM_INT32, startFlight, &startFlight)
+
+PARAM_GROUP_STOP(flightActivation)

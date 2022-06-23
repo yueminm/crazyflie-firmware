@@ -735,9 +735,9 @@ void kalmanCoreExternalizeState(const kalmanCoreData_t* this, state_t *state, co
       // .z = this->R[2][0]*this->S[KC_STATE_PX] + this->R[2][1]*this->S[KC_STATE_PY] + this->R[2][2]*this->S[KC_STATE_PZ]
   
       // body frame
-      .x = this->R[0][0],
-      .y = this->R[1][0],
-      .z = this->R[2][0]
+      .x = this->S[KC_STATE_PX],
+      .y = this->S[KC_STATE_PY],
+      .z = this->S[KC_STATE_PZ]
   };
 
   // angular velocity in body frame

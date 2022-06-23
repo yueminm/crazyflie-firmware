@@ -5,11 +5,12 @@
 #include "math3d.h"
 #include "controller_hover.h"
 #include "physicalConstants.h"
+#include <stdio.h>
 
 #include "cf_math.h"
+#include "console.h"
 
 
-static float massThrust = 132000;
 
 // Quadrotor parameters
 static const float m = CF_MASS;
@@ -25,6 +26,13 @@ static float K[4][12] = {{-2.1398221744492862, 3.3927677807562483e-9, 1.57981362
 
 static const float u0 = m * g / (4 * kt);
 static float uhover[4] = {u0, u0, u0, u0};
+static float thrust_new[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+
+static float x0[13] = {0.0f, 0.0f, 0.0f,
+                      1.0f, 0.0f, 0.0f, 0.0f,
+                      0.0f, 0.0f, 0.0f,
+                      0.0f, 0.0f, 0.0f};
+
 
 void controllerHoverReset(void)
 {
@@ -48,6 +56,7 @@ bool controllerHoverTest(void)
 // Quaternion helper functions
 arm_matrix_instance_f32 hat(arm_matrix_instance_f32 *v)
 {
+  assert_aligned_4_bytes(v);
   float res_tmp[3][3] = {{0, -v->pData[2], v->pData[1]}, {v->pData[2], 0, -v->pData[0]}, {-v->pData[1], v->pData[0], 0}};
   arm_matrix_instance_f32 res = {3, 3, (float *)res_tmp};
   return res;
@@ -55,6 +64,7 @@ arm_matrix_instance_f32 hat(arm_matrix_instance_f32 *v)
 
 arm_matrix_instance_f32 L(arm_matrix_instance_f32 *q)
 {
+  assert_aligned_4_bytes(q);
   float res_tmp[4][4];
   res_tmp[0][0] = q->pData[0];
   res_tmp[0][1] = -q->pData[1];
@@ -62,16 +72,16 @@ arm_matrix_instance_f32 L(arm_matrix_instance_f32 *q)
   res_tmp[0][3] = -q->pData[3];
   res_tmp[1][0] = q->pData[1];
   res_tmp[1][1] = q->pData[0];
-  res_tmp[1][2] = -q->pData[3] + q->pData[0];
-  res_tmp[1][3] = q->pData[2] + q->pData[0];
+  res_tmp[1][2] = -q->pData[3];
+  res_tmp[1][3] = q->pData[2];
   res_tmp[2][0] = q->pData[2];
-  res_tmp[2][1] = q->pData[3] + q->pData[0]; 
+  res_tmp[2][1] = q->pData[3]; 
   res_tmp[2][2] = q->pData[0];
-  res_tmp[2][3] = -q->pData[1] + q->pData[0];
+  res_tmp[2][3] = -q->pData[1];
   res_tmp[3][0] = q->pData[3];
-  res_tmp[3][1] = -q->pData[2] + q->pData[0];
-  res_tmp[3][2] = q->pData[1] + q->pData[0];
-  res_tmp[3][3] = -q->pData[2] + q->pData[0];
+  res_tmp[3][1] = -q->pData[2];
+  res_tmp[3][2] = q->pData[1];
+  res_tmp[3][3] = q->pData[0];
   arm_matrix_instance_f32 res = {4, 4, (float *)res_tmp};
   return res;
 }
@@ -84,6 +94,7 @@ void qtorp(arm_matrix_instance_f32 *q, float res[3])
   // res_tmp[2] = q->pData[3] / q->pData[0];
   // arm_matrix_instance_f32 res = {3, 1, (float *)res_tmp};
   // return res;
+  assert_aligned_4_bytes(q);
   res[0] = q->pData[1] / q->pData[0];
   res[1] = q->pData[2] / q->pData[0];
   res[2] = q->pData[3] / q->pData[0];
@@ -101,15 +112,17 @@ void computeThrust(float x[13], float x0[13], float K_array[4][12], float uhover
   arm_matrix_instance_f32 q = {4, 1, (float *)q_array};
   
   arm_matrix_instance_f32 Lq0 = L(&q0);
-  arm_matrix_instance_f32 Lq0_T;
+  float Lq0_T_array[4][4];
+  arm_matrix_instance_f32 Lq0_T = {4, 4, (float *)Lq0_T_array};
   mat_trans(&Lq0, &Lq0_T);
-  arm_matrix_instance_f32 Lq0_T_q;
+  float Lq0_T_q_array[4][1];
+  arm_matrix_instance_f32 Lq0_T_q = {4, 1, (float *)Lq0_T_q_array};
   mat_mult(&Lq0_T, &q, &Lq0_T_q);
   // arm_matrix_instance_f32 phi = qtorp(&Lq0_T_q);
   float phi[3];
   qtorp(&Lq0_T_q, phi);
   
-  float delta_x_array[12];
+  float32_t delta_x_array[12];
   delta_x_array[0] = x[0]-x0[0];
   delta_x_array[1] = x[1]-x0[1];
   delta_x_array[2] = x[2]-x0[2];
@@ -125,7 +138,8 @@ void computeThrust(float x[13], float x0[13], float K_array[4][12], float uhover
   arm_matrix_instance_f32 delta_x = {12, 1, (float *)delta_x_array};
 
   arm_matrix_instance_f32 K = {4, 12, (float *)K_array};
-  arm_matrix_instance_f32 K_delta_x;
+  float K_delta_x_array[4][1];
+  arm_matrix_instance_f32 K_delta_x = {4, 1, (float *)K_delta_x_array};
   mat_mult(&K, &delta_x, &K_delta_x);
 
   thrust[0] = uhover[0] - K_delta_x.pData[0];
@@ -145,55 +159,91 @@ void controllerHover(control_t *control, setpoint_t *setpoint,
     return;
   }
 
-  // Set the state
-  float r_x = state->position.x;
-  float r_y = state->position.y;
-  float r_z = state->position.z;
-  float q_w = state->attitudeQuaternion.w;
-  float q_x = state->attitudeQuaternion.x;
-  float q_y = state->attitudeQuaternion.y;
-  float q_z = state->attitudeQuaternion.z;
-  float v_x = state->velocity.x;
-  float v_y = state->velocity.y;
-  float v_z = state->velocity.z;
-  float omega_x = sensors->gyro.x;
-  float omega_y = sensors->gyro.y;
-  float omega_z = sensors->gyro.z;
+  if (setpoint->velocity.z == 0){
+    x0[0] = state->position.x;
+    x0[1] = state->position.y;
+    x0[2] = state->position.z;
+    x0[3] = state->attitudeQuaternion.w;
+    x0[4] = state->attitudeQuaternion.x;
+    x0[5] = state->attitudeQuaternion.y;
+    x0[6] = state->attitudeQuaternion.z;
+    x0[7] = state->velocity.x;
+    x0[8] = state->velocity.y;
+    x0[9] = state->velocity.z;
+    x0[10] = radians(sensors->gyro.x);
+    x0[11] = radians(sensors->gyro.y);
+    x0[12] = radians(sensors->gyro.z);
+  }
 
-  float x[13] = {r_x, r_y, r_z, 
-                 q_w, q_x, q_y, q_z,
-                 v_x, v_y, v_z,
-                 omega_x, omega_y, omega_z};
-  
-  float x0[13] = {0.0f, 0.0f, 0.0f,
-                  1.0f, 0.0f, 0.0f, 0.0f,
-                  0.0f, 0.0f, 0.0f,
-                  0.0f, 0.0f, 0.0f};
-  
-  float thrust[4];
+  else {
+    // Set the state
+    float r_x = state->position.x;
+    float r_y = state->position.y;
+    float r_z = state->position.z;
+    float q_w = state->attitudeQuaternion.w;
+    float q_x = state->attitudeQuaternion.x;
+    float q_y = state->attitudeQuaternion.y;
+    float q_z = state->attitudeQuaternion.z;
+    float v_x = state->velocity.x;
+    float v_y = state->velocity.y;
+    float v_z = state->velocity.z;
+    float omega_x = radians(sensors->gyro.x);
+    float omega_y = radians(sensors->gyro.y);
+    float omega_z = radians(sensors->gyro.z);
 
-  computeThrust(x, x0, K, uhover, thrust);
+    float x[13] = {r_x, r_y, r_z, 
+                  q_w, q_x, q_y, q_z,
+                  v_x, v_y, v_z,
+                  omega_x, omega_y, omega_z};
+    
+    // float x0[13] = {0.0f, 0.0f, 0.0f,
+    //                 1.0f, 0.0f, 0.0f, 0.0f,
+    //                 0.0f, 0.0f, 0.0f,
+    //                 0.0f, 0.0f, 0.0f};
+    
+    
 
-  motorPower->m1 = thrust[0];
-  motorPower->m2 = thrust[1];
-  motorPower->m3 = thrust[2];
-  motorPower->m4 = thrust[3];
+    computeThrust(x, x0, K, uhover, thrust_new);
 
+    motorPower->m1 = thrust_new[0];
+    motorPower->m2 = thrust_new[1];
+    motorPower->m3 = thrust_new[2];
+    motorPower->m4 = thrust_new[3];
+  }
 }
 
-PARAM_GROUP_START(ctrlMel)
-PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, massThrust, &massThrust)
-PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, m, &m)
-PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, J, &J)
-PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, l, &l)
-PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, g, &g)
-PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, kt, &kt)
-PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, km, &km)
-PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, K, &K)
+PARAM_GROUP_START(ctrlHover)
+// PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, m, &m)
+// PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, J, &J)
+// PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, l, &l)
+// PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, g, &g)
+// PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, kt, &kt)
+// PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, km, &km)
+// PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, K, &K)
 
-PARAM_GROUP_STOP(ctrlMel)
+PARAM_GROUP_STOP(ctrlHover)
 
-LOG_GROUP_START(ctrlMel)
-LOG_ADD(LOG_FLOAT, u0, &u0)
-LOG_ADD(LOG_FLOAT, uhover, &uhover)
-LOG_GROUP_STOP(ctrlMel)
+LOG_GROUP_START(ctrlHover)
+LOG_ADD(LOG_FLOAT, thrust1, &thrust_new[0])
+LOG_ADD(LOG_FLOAT, thrust2, &thrust_new[1])
+LOG_ADD(LOG_FLOAT, thrust3, &thrust_new[2])
+LOG_ADD(LOG_FLOAT, thrust4, &thrust_new[3])
+
+LOG_ADD(LOG_FLOAT, rx0, &x0[0])
+LOG_ADD(LOG_FLOAT, ry0, &x0[1])
+LOG_ADD(LOG_FLOAT, rz0, &x0[2])
+
+LOG_ADD(LOG_FLOAT, qw0, &x0[3])
+LOG_ADD(LOG_FLOAT, qw1, &x0[4])
+LOG_ADD(LOG_FLOAT, qw2, &x0[5])
+LOG_ADD(LOG_FLOAT, qw3, &x0[6])
+
+LOG_ADD(LOG_FLOAT, vx0, &x0[7])
+LOG_ADD(LOG_FLOAT, vy0, &x0[8])
+LOG_ADD(LOG_FLOAT, vz0, &x0[9])
+
+LOG_ADD(LOG_FLOAT, ox0, &x0[10])
+LOG_ADD(LOG_FLOAT, oy0, &x0[11])
+LOG_ADD(LOG_FLOAT, oz0, &x0[12])
+
+LOG_GROUP_STOP(ctrlHover)

@@ -1,1 +1,1 @@
-obj-y += controller_hover.o
+obj-y += test_controller_hover.o
