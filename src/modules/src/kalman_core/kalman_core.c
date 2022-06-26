@@ -728,6 +728,13 @@ void kalmanCoreExternalizeState(const kalmanCoreData_t* this, state_t *state, co
   };
 
   // velocity is in body frame and needs to be rotated to world frame
+  state->velocityWorld = (velocity_world_t){
+    .timestamp = tick,
+      .x = this->R[0][0]*this->S[KC_STATE_PX] + this->R[0][1]*this->S[KC_STATE_PY] + this->R[0][2]*this->S[KC_STATE_PZ],
+      .y = this->R[1][0]*this->S[KC_STATE_PX] + this->R[1][1]*this->S[KC_STATE_PY] + this->R[1][2]*this->S[KC_STATE_PZ],
+      .z = this->R[2][0]*this->S[KC_STATE_PX] + this->R[2][1]*this->S[KC_STATE_PY] + this->R[2][2]*this->S[KC_STATE_PZ]
+  };
+
   state->velocity = (velocity_t){
       .timestamp = tick,
       // .x = this->R[0][0]*this->S[KC_STATE_PX] + this->R[0][1]*this->S[KC_STATE_PY] + this->R[0][2]*this->S[KC_STATE_PZ],

@@ -31,7 +31,7 @@ static void setInitialSetpoint(setpoint_t *setpoint, float vz)
   setpoint->velocity_body = true;
 }
 
-static void setMotorPower(motors_thrust_t *motorPower, float thrust[4])
+static void setMotorPower(motors_thrust_t *motorPower, int thrust[4])
 {
   motorPower->m1 = thrust[0];
   motorPower->m2 = thrust[1];
@@ -55,7 +55,7 @@ void appMain()
 {
   static setpoint_t setpoint;
   static motors_thrust_t motorPower;
-  float thrust_idle[4] = {0, 0, 0, 0};
+  int thrust_idle[4] = {0, 0, 0, 0};
 
 
   vTaskDelay(M2T(1000));

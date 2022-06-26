@@ -15,23 +15,35 @@
 // Quadrotor parameters
 static const float m = CF_MASS;
 static const float J[3][3] = {{0.00003144988f, 0.0f, 0.0f}, {0.0f, 0.00003151127f, 0.0f}, {0.0f, 0.0f, 0.00007058874f}};
-static const float l = 0.05665f;
+// static const float l = 0.042f;
 static const float g = GRAVITY_MAGNITUDE;
-static const float kt = 0.0000024f;
-static const float km = 0.00004f;
-static float K[4][12] = {{-2.1398221744492862, 3.3927677807562483e-9, 1.5798136284546844, -5.37111075959507e-7, -347.8587787977323, 1.428948187756977, -8.969732422783848, 1.4198469130519278e-8, 94.2812090567359, -2.663439073810879e-7, -199.53556628523756, 1.6347219179853862},
-                               {4.31115326155242e-10, -2.139774485194827, 1.5798137021108338, 347.5272787699625, 6.089609142733408e-8, -1.4289481877006056, 1.7330924373656535e-9, -8.9655951967907, 94.28121342949639, 199.24552404336865, 2.695163534893664e-8, -1.6347219179741024},
-                               {2.1398221745478847, -3.522732588053427e-9, 1.5798137241263719, 5.594016068951116e-7, 347.8587788147985, 1.4289481878262522, 8.96973242322293, -1.4742708433542197e-8, 94.28121477915509, 3.070757493329903e-7, 199.53556629472456, 1.6347219179990207},
-                               {-3.223807847258532e-10, 2.1397744850679294, 1.5798136504059304, -347.52727874831646, -4.279839624951763e-8, -1.4289481880797557, -1.2578718614751723e-9, 8.96559519625992, 94.28121040247525, -199.24552400331754, -1.7205339190848196e-8, -1.6347219180385664}};
+// static const float kt = 0.000009f;
+static float K[4][12] = {{-2.1111338809910256, -7.207516174425559e-10, 1.5785755111434507, 6.017379686544216e-8, -211.97035532655272, 1.5610626124198432, -7.076254625482424, -2.254841761000844e-9, 48.7368361888653, 1.974425853122233e-8, -93.3604575689346, 3.7303351206875837},
+                         {-8.795079714807122e-13, -2.1110711123990322, 1.5785755142261677, 211.77143487247827, 1.3160658601897058e-9, -1.5610626123239035, 2.918253647663058e-11, -7.0731146868181565, 48.736836283475604, 93.22539702517304, 6.68246173887247e-10, -3.7303351204756448},
+                         {2.1111338809797546, 8.039592555668976e-10, 1.5785755227341753, -6.68554050895323e-8, 211.9703553283179, 1.5610626124157603, 7.076254625509039, 2.495118152731056e-9, 48.73683655147123, -2.2637825756993564e-8, 93.36045756999391, 3.7303351206817412},
+                         {2.1111338809797546, 8.039592555668976e-10, 1.5785755227341753, -6.68554050895323e-8, 211.9703553283179, 1.5610626124157603, 7.076254625509039, 2.495118152731056e-9, 48.73683655147123, -2.2637825756993564e-8, 93.36045756999391, 3.7303351206817412}};
 
-static const float u0 = m * g / (4 * kt);
+
+static const float u0 = m / 0.06f * 65536.0f / 4;
 static float uhover[4] = {u0, u0, u0, u0};
 static float thrust_new[4] = {0.0f, 0.0f, 0.0f, 0.0f};
 
-static float x0[13] = {0.0f, 0.0f, 0.0f,
+static float x0[13] = {0.0f, 0.0f, 1.0f,
                       1.0f, 0.0f, 0.0f, 0.0f,
                       0.0f, 0.0f, 0.0f,
                       0.0f, 0.0f, 0.0f};
+
+static float x[13] = {0.0f, 0.0f, 0.0f,
+                      1.0f, 0.0f, 0.0f, 0.0f,
+                      0.0f, 0.0f, 0.0f,
+                      0.0f, 0.0f, 0.0f};
+
+static float velocity_world[3] = {0.0f, 0.0f, 0.0f};
+
+// Debugging
+// static int count = 0;
+// static float error_point[10][13];
+
 
 
 void controllerHoverReset(void)
@@ -142,10 +154,10 @@ void computeThrust(float x[13], float x0[13], float K_array[4][12], float uhover
   arm_matrix_instance_f32 K_delta_x = {4, 1, (float *)K_delta_x_array};
   mat_mult(&K, &delta_x, &K_delta_x);
 
-  thrust[0] = uhover[0] - K_delta_x.pData[0];
-  thrust[1] = uhover[1] - K_delta_x.pData[1];
-  thrust[2] = uhover[2] - K_delta_x.pData[2];
-  thrust[3] = uhover[3] - K_delta_x.pData[3];
+  thrust[0] = (uhover[0] - K_delta_x.pData[0])*1.0f;
+  thrust[1] = (uhover[1] - K_delta_x.pData[1])*1.0f;
+  thrust[2] = (uhover[2] - K_delta_x.pData[2])*1.0f;
+  thrust[3] = (uhover[3] - K_delta_x.pData[3])*1.0f;
 }
 
 
@@ -159,20 +171,11 @@ void controllerHover(control_t *control, setpoint_t *setpoint,
     return;
   }
 
-  if (setpoint->velocity.z == 0){
-    x0[0] = state->position.x;
-    x0[1] = state->position.y;
-    x0[2] = state->position.z;
-    x0[3] = state->attitudeQuaternion.w;
-    x0[4] = state->attitudeQuaternion.x;
-    x0[5] = state->attitudeQuaternion.y;
-    x0[6] = state->attitudeQuaternion.z;
-    x0[7] = state->velocity.x;
-    x0[8] = state->velocity.y;
-    x0[9] = state->velocity.z;
-    x0[10] = radians(sensors->gyro.x);
-    x0[11] = radians(sensors->gyro.y);
-    x0[12] = radians(sensors->gyro.z);
+  if (setpoint->velocity.z == 0) {
+    motorPower->m1 = 0;
+    motorPower->m2 = 0;
+    motorPower->m3 = 0;
+    motorPower->m4 = 0;
   }
 
   else {
@@ -191,11 +194,24 @@ void controllerHover(control_t *control, setpoint_t *setpoint,
     float omega_y = radians(sensors->gyro.y);
     float omega_z = radians(sensors->gyro.z);
 
-    float x[13] = {r_x, r_y, r_z, 
-                  q_w, q_x, q_y, q_z,
-                  v_x, v_y, v_z,
-                  omega_x, omega_y, omega_z};
-    
+    velocity_world[0] = state->velocityWorld.x;
+    velocity_world[1] = state->velocityWorld.y;
+    velocity_world[2] = state->velocityWorld.z;
+
+    x[0] = r_x;
+    x[1] = r_y;
+    x[2] = r_z;
+    x[3] = q_w;
+    x[4] = q_x;
+    x[5] = q_y;
+    x[6] = q_z;
+    x[7] = v_x;
+    x[8] = v_y;
+    x[9] = v_z;
+    x[10] = omega_x;
+    x[11] = omega_y;
+    x[12] = omega_z;
+   
     // float x0[13] = {0.0f, 0.0f, 0.0f,
     //                 1.0f, 0.0f, 0.0f, 0.0f,
     //                 0.0f, 0.0f, 0.0f,
@@ -204,11 +220,40 @@ void controllerHover(control_t *control, setpoint_t *setpoint,
     
 
     computeThrust(x, x0, K, uhover, thrust_new);
+    
+    if (!(isnan(thrust_new[0]) || isnan(thrust_new[1]) || isnan(thrust_new[2]) || isnan(thrust_new[3]) ||
+        thrust_new[0] > 65536 || thrust_new[1] > 65536 || thrust_new[2] > 65536 || thrust_new[3] > 65536 ||
+        thrust_new[0] < 0 || thrust_new[1] < 0 || thrust_new[2] < 0 || thrust_new[3] < 0))
+    {
+      int thrust1 = (int) thrust_new[0] * 2.0;
+      int thrust2 = (int) thrust_new[1] * 2.0;
+      int thrust3 = (int) thrust_new[2] * 2.0;
+      int thrust4 = (int) thrust_new[3] * 2.0;
 
-    motorPower->m1 = thrust_new[0];
-    motorPower->m2 = thrust_new[1];
-    motorPower->m3 = thrust_new[2];
-    motorPower->m4 = thrust_new[3];
+      motorPower->m1 = thrust1;
+      motorPower->m2 = thrust2;
+      motorPower->m3 = thrust3;
+      motorPower->m4 = thrust4;
+    }
+
+    // if (isnan(thrust_new[0]) || isnan(thrust_new[1]) || isnan(thrust_new[2]) || isnan(thrust_new[3]))
+    // {
+    //   if (count > 9) {return;}
+    //   error_point[count][0] = r_x;
+    //   error_point[count][1] = r_y;
+    //   error_point[count][2] = r_z;
+    //   error_point[count][3] = q_w;
+    //   error_point[count][4] = q_x;
+    //   error_point[count][5] = q_y;
+    //   error_point[count][6] = q_z;
+    //   error_point[count][7] = v_x;
+    //   error_point[count][8] = v_y;
+    //   error_point[count][9] = v_z;
+    //   error_point[count][10] = omega_x;
+    //   error_point[count][11] = omega_y;
+    //   error_point[count][12] = omega_z;
+    //   count = count + 1;
+    // }
   }
 }
 
@@ -234,9 +279,9 @@ LOG_ADD(LOG_FLOAT, ry0, &x0[1])
 LOG_ADD(LOG_FLOAT, rz0, &x0[2])
 
 LOG_ADD(LOG_FLOAT, qw0, &x0[3])
-LOG_ADD(LOG_FLOAT, qw1, &x0[4])
-LOG_ADD(LOG_FLOAT, qw2, &x0[5])
-LOG_ADD(LOG_FLOAT, qw3, &x0[6])
+LOG_ADD(LOG_FLOAT, qx0, &x0[4])
+LOG_ADD(LOG_FLOAT, qy0, &x0[5])
+LOG_ADD(LOG_FLOAT, qz0, &x0[6])
 
 LOG_ADD(LOG_FLOAT, vx0, &x0[7])
 LOG_ADD(LOG_FLOAT, vy0, &x0[8])
@@ -245,5 +290,59 @@ LOG_ADD(LOG_FLOAT, vz0, &x0[9])
 LOG_ADD(LOG_FLOAT, ox0, &x0[10])
 LOG_ADD(LOG_FLOAT, oy0, &x0[11])
 LOG_ADD(LOG_FLOAT, oz0, &x0[12])
+
+LOG_ADD(LOG_FLOAT, rx, &x[0])
+LOG_ADD(LOG_FLOAT, ry, &x[1])
+LOG_ADD(LOG_FLOAT, rz, &x[2])
+
+LOG_ADD(LOG_FLOAT, qw, &x[3])
+LOG_ADD(LOG_FLOAT, qx, &x[4])
+LOG_ADD(LOG_FLOAT, qy, &x[5])
+LOG_ADD(LOG_FLOAT, qz, &x[6])
+
+LOG_ADD(LOG_FLOAT, vx, &x[7])
+LOG_ADD(LOG_FLOAT, vy, &x[8])
+LOG_ADD(LOG_FLOAT, vz, &x[9])
+
+LOG_ADD(LOG_FLOAT, ox, &x[10])
+LOG_ADD(LOG_FLOAT, oy, &x[11])
+LOG_ADD(LOG_FLOAT, oz, &x[12])
+
+LOG_ADD(LOG_FLOAT, world_vx, &velocity_world[0])
+LOG_ADD(LOG_FLOAT, world_vy, &velocity_world[1])
+LOG_ADD(LOG_FLOAT, world_vz, &velocity_world[2])
+// LOG_ADD(LOG_FLOAT, err1_rx, &error_point[0][0])
+// LOG_ADD(LOG_FLOAT, err1_ry, &error_point[0][1])
+// LOG_ADD(LOG_FLOAT, err1_rz, &error_point[0][2])
+
+// LOG_ADD(LOG_FLOAT, err1_qw, &error_point[0][3])
+// LOG_ADD(LOG_FLOAT, err1_qx, &error_point[0][4])
+// LOG_ADD(LOG_FLOAT, err1_qy, &error_point[0][5])
+// LOG_ADD(LOG_FLOAT, err1_qz, &error_point[0][6])
+
+// LOG_ADD(LOG_FLOAT, err1_vx, &error_point[0][7])
+// LOG_ADD(LOG_FLOAT, err1_vy, &error_point[0][8])
+// LOG_ADD(LOG_FLOAT, err1_vz, &error_point[0][9])
+
+// LOG_ADD(LOG_FLOAT, err1_ox, &error_point[0][10])
+// LOG_ADD(LOG_FLOAT, err1_oy, &error_point[0][11])
+// LOG_ADD(LOG_FLOAT, err1_oz, &error_point[0][12])
+
+// LOG_ADD(LOG_FLOAT, err5_rx, &error_point[5][0])
+// LOG_ADD(LOG_FLOAT, err5_ry, &error_point[5][1])
+// LOG_ADD(LOG_FLOAT, err5_rz, &error_point[5][2])
+
+// LOG_ADD(LOG_FLOAT, err5_qw, &error_point[5][3])
+// LOG_ADD(LOG_FLOAT, err5_qx, &error_point[5][4])
+// LOG_ADD(LOG_FLOAT, err5_qy, &error_point[5][5])
+// LOG_ADD(LOG_FLOAT, err5_qz, &error_point[5][6])
+
+// LOG_ADD(LOG_FLOAT, err5_vx, &error_point[5][7])
+// LOG_ADD(LOG_FLOAT, err5_vy, &error_point[5][8])
+// LOG_ADD(LOG_FLOAT, err5_vz, &error_point[5][9])
+
+// LOG_ADD(LOG_FLOAT, err5_ox, &error_point[5][10])
+// LOG_ADD(LOG_FLOAT, err5_oy, &error_point[5][11])
+// LOG_ADD(LOG_FLOAT, err5_oz, &error_point[5][12])
 
 LOG_GROUP_STOP(ctrlHover)
