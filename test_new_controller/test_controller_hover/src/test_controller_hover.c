@@ -79,11 +79,15 @@ void appMain()
       setMotorPower(&motorPower, thrust_idle);
       }
 
-    else {
+    else if (startFlight == 1) {
       setInitialSetpoint(&setpoint, 1.0f);
       commanderSetSetpoint(&setpoint, 3);
       }
-    
+
+    else if (startFlight == 2) {
+      setInitialSetpoint(&setpoint, 2.0f);
+      commanderSetSetpoint(&setpoint, 3);
+      }
   }
 }
 
