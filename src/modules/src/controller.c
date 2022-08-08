@@ -6,11 +6,13 @@
 // #include "controller_pid.h"
 // #include "controller_mellinger.h"
 // #include "controller_indi.h"
-#include "controller_hover.h"
+// #include "controller_hover.h"
+#include "controller_pidlqr.h"
 
 #include "autoconf.h"
 
-#define DEFAULT_CONTROLLER ControllerTypeHover
+// #define DEFAULT_CONTROLLER ControllerTypeHover
+#define DEFAULT_CONTROLLER ControllerTypePIDLQR
 static ControllerType currentController = ControllerTypeAny;
 
 static void initController();
@@ -23,14 +25,15 @@ typedef struct {
 } ControllerFcns;
 
 static ControllerFcns controllerFunctions[] = {
-  {.init = 0, .test = 0, .update = 0, .name = "None"}, // Any
-  // {.init = controllerPidInit, .test = controllerPidTest, .update = controllerPid, .name = "PID"},
-  // {.init = controllerMellingerInit, .test = controllerMellingerTest, .update = controllerMellinger, .name = "Mellinger"},
-  // {.init = controllerINDIInit, .test = controllerINDITest, .update = controllerINDI, .name = "INDI"},
-  {.init = controllerHoverInit, .test = controllerHoverTest, .update = controllerHover, .name = "Hover"},
+    {.init = 0, .test = 0, .update = 0, .name = "None"}, // Any
+    // {.init = controllerPidInit, .test = controllerPidTest, .update = controllerPid, .name = "PID"},
+    // {.init = controllerMellingerInit, .test = controllerMellingerTest, .update = controllerMellinger, .name = "Mellinger"},
+    // {.init = controllerINDIInit, .test = controllerINDITest, .update = controllerINDI, .name = "INDI"},
+    // {.init = controllerHoverInit, .test = controllerHoverTest, .update = controllerHover, .name = "Hover"},
+    // {.init = controllerPIDLQRInit, .test = controllerPIDLQRTest, .update = controllerPIDLQR, .name = "PIDLQR"},
+    {.init = controllerPIDLQRInit},
 
 };
-
 
 void controllerInit(ControllerType controller) {
   if (controller < 0 || controller >= ControllerType_COUNT) {
@@ -49,11 +52,13 @@ void controllerInit(ControllerType controller) {
   //   #define CONTROLLER ControllerTypeINDI
   // #elif defined(CONFIG_CONTROLLER_MELLINGER)
   //   #define CONTROLLER ControllerTypeMellinger
-  #if defined(CONFIG_CONTROLLER_Hover)
-    #define CONTROLLER ControllerTypeHover
-  #else
-    #define CONTROLLER ControllerTypeAny
-  #endif
+  // #if defined(CONFIG_CONTROLLER_Hover)
+  //   #define CONTROLLER ControllerTypeHover
+#if defined(CONFIG_CONTROLLER_PIDLQR)
+  #define CONTROLLER ControllerTypePIDLQR
+#else
+  #define CONTROLLER ControllerTypeAny
+#endif
 
   ControllerType forcedController = CONTROLLER;
   if (forcedController != ControllerTypeAny) {
